@@ -1,6 +1,12 @@
 # PIC16F1455 USB HID Skeleton
 
-A crystal-less USB HID starter project for the **Microchip PIC16F1455**. It includes a small firmware application, on-chip Flash read/write commands, a browser-based WebHID console, and a Python test client.
+**Compatible MCUs:** Microchip PIC16F1455, PIC16F1459, and PIC16F1454.
+
+A crystal-less USB HID starter project for the PIC16F145x family. It includes a small firmware application, on-chip Flash read/write commands, a browser-based WebHID console, and a Python test client. The MPLAB X project currently targets the PIC16F1455; select the matching device and verify the package pinout when using another variant.
+
+![PIC16F1455 in a 14-pin DIP package](images/pic16f1455_dip.jpg)
+
+The PIC16F145x combines USB support with GPIO drive capability up to 20 mA per pin and low-power sleep modes, making it a capable choice for compact, power-conscious projects. Observe the datasheet's per-pin, port, and total-current limits; this USB example keeps the device active to maintain its connection, so its runtime power consumption depends on the operating conditions.
 
 The firmware uses the PIC's internal oscillator and USB HID class support, so no external crystal or custom host driver is needed.
 
@@ -9,6 +15,8 @@ The firmware uses the PIC's internal oscillator and USB HID class support, so no
 - USB Full-Speed operation using the internal oscillator, PLL, and Active Clock Tuning (ACT).
 - Standard HID reports with 64-byte input and output payloads.
 - Example commands to control an LED, exchange an application value, and inspect the main-loop counter.
+- GPIO output drive up to 20 mA per pin, subject to device current limits and suitable load design.
+- Low-power sleep modes available for applications that can suspend activity; this USB demo remains active while serving the connection.
 - Two 32-byte Flash rows reserved for host read/write tests at `0x1FC0` and `0x1FE0`.
 - Low-voltage programming enabled in the device configuration.
 - A standalone WebHID interface and a Python `hidapi` test script.
