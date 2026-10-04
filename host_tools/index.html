@@ -1,0 +1,312 @@
+<!--
+  Copyright (c) 2026 Rilassaru (https://rilassaru.blog.jp/)
+  SPDX-License-Identifier: BSD-2-Clause
+
+  Released under the 2-Clause BSD License (see LICENSE file).
+  Parts of the USB driver are based on Microchip Technology Inc. framework.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PIC16F1455 WebHID Console</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 24px;
+      background: #f4f6f9;
+      color: #333;
+    }
+    h1 {
+      margin-bottom: 8px;
+    }
+    .panel {
+      background: #fff;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+      max-width: 720px;
+    }
+    .panel h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 8px;
+    }
+    button {
+      background: #0066cc;
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      margin-right: 8px;
+      margin-top: 4px;
+    }
+    button:hover { background: #0052a3; }
+    button:disabled { background: #bbb; cursor: not-allowed; }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 0.85rem;
+    }
+    .connected { background: #d4edda; color: #155724; }
+    .disconnected { background: #f8d7da; color: #721c24; }
+    .log-box {
+      background: #1e1e1e;
+      color: #eee;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.85rem;
+      padding: 12px;
+      border-radius: 6px;
+      height: 240px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .form-row {
+      margin-bottom: 12px;
+    }
+    label {
+      font-weight: bold;
+      margin-right: 8px;
+    }
+    input[type="text"], select {
+      padding: 6px 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>PIC16F1455 WebHID Console</h1>
+  <p>USB HID test tool with no external oscillator or driver required</p>
+
+  <!-- Device connection controls -->
+  <div class="panel">
+    <h2>1. Connection</h2>
+    <button id="btnConnect">Connect Device</button>
+    <button id="btnDisconnect" disabled>Disconnect</button>
+    <span id="connStatus" class="status-badge disconnected">Disconnected</span>
+  </div>
+
+  <!-- Device status and LED controls -->
+  <div class="panel">
+    <h2>2. Status and LED Control</h2>
+    <button id="btnGetStatus" disabled>CMD_GET_STATUS (Get Status)</button>
+    <div style="margin-top: 12px;">
+      <button id="btnLedOn" disabled>Turn LED On</button>
+      <button id="btnLedOff" disabled>Turn LED Off</button>
+      <button id="btnLedToggle" disabled>Toggle LED</button>
+    </div>
+  </div>
+
+  <!-- Flash memory read and write controls -->
+  <div class="panel">
+    <h2>3. Flash Memory (32 Bytes)</h2>
+    <div class="form-row">
+      <label for="pageSelect">Select Page:</label>
+      <select id="pageSelect" disabled>
+        <option value="0">Page 0 (0x1FC0〜0x1FDF)</option>
+        <option value="1">Page 1 (0x1FE0〜0x1FFF)</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <button id="btnGetData" disabled>CMD_GET_DATA (Read)</button>
+    </div>
+    <div class="form-row">
+      <label for="hexDataInput">Data to Write (32 Bytes in Hex):</label><br>
+      <input type="text" id="hexDataInput" style="width: 90%; margin-top: 4px;" 
+             value="55 AA 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E" disabled>
+    </div>
+    <button id="btnSetData" disabled>CMD_SET_DATA (Write and Verify)</button>
+  </div>
+
+  <!-- Communication log -->
+  <div class="panel">
+    <h2>Communication Log</h2>
+    <div id="logBox" class="log-box"></div>
+    <button id="btnClearLog" style="margin-top: 8px; background: #6c757d;">Clear Log</button>
+  </div>
+
+  <script>
+    // Protocol values must match usb_descriptors.c and user_app.h in the firmware.
+    const VENDOR_ID  = 0x04D8;
+    const PRODUCT_ID = 0x003C;
+
+    const CMD_GET_STATUS = 0x10;
+    const CMD_SET_STATUS = 0x11;
+    const CMD_GET_DATA   = 0x20;
+    const CMD_SET_DATA   = 0x21;
+
+    const LED_CMD_OFF    = 0;
+    const LED_CMD_ON     = 1;
+    const LED_CMD_TOGGLE = 2;
+
+    let hidDevice = null;
+
+    // Get the page elements that this script will update or listen to.
+    const btnConnect    = document.getElementById('btnConnect');
+    const btnDisconnect = document.getElementById('btnDisconnect');
+    const connStatus    = document.getElementById('connStatus');
+    const btnGetStatus  = document.getElementById('btnGetStatus');
+    const btnLedOn      = document.getElementById('btnLedOn');
+    const btnLedOff     = document.getElementById('btnLedOff');
+    const btnLedToggle  = document.getElementById('btnLedToggle');
+    const pageSelect    = document.getElementById('pageSelect');
+    const btnGetData    = document.getElementById('btnGetData');
+    const hexDataInput  = document.getElementById('hexDataInput');
+    const btnSetData    = document.getElementById('btnSetData');
+    const logBox        = document.getElementById('logBox');
+    const btnClearLog   = document.getElementById('btnClearLog');
+
+    function log(message) {
+      const now = new Date().toTimeString().split(' ')[0];
+      logBox.textContent += `[${now}] ${message}\n`;
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function setConnectedUI(connected) {
+      connStatus.textContent = connected ? "Connected" : "Disconnected";
+      connStatus.className = "status-badge " + (connected ? "connected" : "disconnected");
+      btnConnect.disabled = connected;
+      btnDisconnect.disabled = !connected;
+      btnGetStatus.disabled = !connected;
+      btnLedOn.disabled = !connected;
+      btnLedOff.disabled = !connected;
+      btnLedToggle.disabled = !connected;
+      pageSelect.disabled = !connected;
+      btnGetData.disabled = !connected;
+      hexDataInput.disabled = !connected;
+      btnSetData.disabled = !connected;
+    }
+
+    // Ask the browser to select the matching HID device, then open it.
+    btnConnect.addEventListener('click', async () => {
+      if (!("hid" in navigator)) {
+        alert("Your browser does not support WebHID. Please use Google Chrome or Microsoft Edge.");
+        return;
+      }
+      try {
+        const devices = await navigator.hid.requestDevice({
+          filters: [{ vendorId: VENDOR_ID, productId: PRODUCT_ID }]
+        });
+        if (devices.length === 0) return;
+
+        hidDevice = devices[0];
+        await hidDevice.open();
+
+        hidDevice.addEventListener('inputreport', handleInputReport);
+        setConnectedUI(true);
+        log(`Connected: ${hidDevice.productName || "PIC16F1455 HID"}`);
+      } catch (err) {
+        log(`Connection error: ${err.message}`);
+      }
+    });
+
+    // Close the device and restore the disconnected UI state.
+    btnDisconnect.addEventListener('click', async () => {
+      if (hidDevice) {
+        await hidDevice.close();
+        hidDevice = null;
+        setConnectedUI(false);
+        log("Disconnected");
+      }
+    });
+
+    // Send a fixed-size 64-byte report: the command is byte 0, followed by payload bytes.
+    async function sendReport(cmd, payload = []) {
+      if (!hidDevice || !hidDevice.opened) return;
+      const data = new Uint8Array(64);
+      data[0] = cmd;
+      for (let i = 0; i < payload.length && (i + 1) < 64; i++) {
+        data[i + 1] = payload[i];
+      }
+      // This device uses Report ID 0x00 for its HID reports.
+      await hidDevice.sendReport(0x00, data);
+    }
+
+    // Decode the response report using the layout defined by the device firmware.
+    function handleInputReport(event) {
+      const view = event.data;
+      const result = view.getUint8(0);
+
+      // Status responses contain the LED value, user value, and a 32-bit loop counter.
+      if (view.byteLength >= 7 && (lastSentCmd === CMD_GET_STATUS || lastSentCmd === CMD_SET_STATUS)) {
+        const led = view.getUint8(1);
+        const userVal = view.getUint8(2);
+        const loopCount = (view.getUint8(3) << 24) | (view.getUint8(4) << 16) | (view.getUint8(5) << 8) | view.getUint8(6);
+        log(`[STATUS Response] Result: ${result}, LED: ${led ? "On" : "Off"}, UserVal: 0x${userVal.toString(16).toUpperCase()}, LoopCount: ${loopCount >>> 0}`);
+      }
+      // Data responses contain a page, a 16-bit address, and 32 data bytes.
+      else if (view.byteLength >= 36 && (lastSentCmd === CMD_GET_DATA || lastSentCmd === CMD_SET_DATA)) {
+        const page = view.getUint8(1);
+        const addr = (view.getUint8(2) << 8) | view.getUint8(3);
+        const hexDump = [];
+        for (let i = 4; i < 36; i++) {
+          hexDump.push(view.getUint8(i).toString(16).padStart(2, '0').toUpperCase());
+        }
+        const cmdName = (lastSentCmd === CMD_GET_DATA) ? "GET_DATA" : "SET_DATA (Verify)";
+        log(`[${cmdName} Response] Page: ${page}, Address: 0x${addr.toString(16).toUpperCase()}`);
+        log(`Data: ${hexDump.join(" ")}`);
+      } else {
+        log(`[Received] Result: ${result} (Length: ${view.byteLength})`);
+      }
+    }
+
+    let lastSentCmd = 0;
+
+    // Request the current device status.
+    btnGetStatus.addEventListener('click', async () => {
+      lastSentCmd = CMD_GET_STATUS;
+      await sendReport(CMD_GET_STATUS);
+    });
+
+    // Send the requested LED state and a sample user value.
+    btnLedOn.addEventListener('click', async () => {
+      lastSentCmd = CMD_SET_STATUS;
+      await sendReport(CMD_SET_STATUS, [LED_CMD_ON, 0x11]);
+    });
+    btnLedOff.addEventListener('click', async () => {
+      lastSentCmd = CMD_SET_STATUS;
+      await sendReport(CMD_SET_STATUS, [LED_CMD_OFF, 0x00]);
+    });
+    btnLedToggle.addEventListener('click', async () => {
+      lastSentCmd = CMD_SET_STATUS;
+      await sendReport(CMD_SET_STATUS, [LED_CMD_TOGGLE, 0x55]);
+    });
+
+    // Read the selected 32-byte Flash page.
+    btnGetData.addEventListener('click', async () => {
+      lastSentCmd = CMD_GET_DATA;
+      const page = parseInt(pageSelect.value, 10);
+      await sendReport(CMD_GET_DATA, [page]);
+    });
+
+    // Write 32 bytes to the selected Flash page.
+    btnSetData.addEventListener('click', async () => {
+      lastSentCmd = CMD_SET_DATA;
+      const page = parseInt(pageSelect.value, 10);
+      
+      // Split the hexadecimal text into byte values for the HID payload.
+      const hexTokens = hexDataInput.value.trim().split(/\s+/);
+      // The firmware expects the page first, two reserved bytes, then 32 data bytes.
+      const payload = [page, 0x00, 0x00];
+      for (let i = 0; i < 32; i++) {
+        const val = hexTokens[i] ? parseInt(hexTokens[i], 16) : 0x00;
+        payload.push(isNaN(val) ? 0x00 : val);
+      }
+      await sendReport(CMD_SET_DATA, payload);
+    });
+
+    btnClearLog.addEventListener('click', () => {
+      logBox.textContent = "";
+    });
+  </script>
+</body>
+</html>

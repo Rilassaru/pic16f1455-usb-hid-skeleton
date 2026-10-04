@@ -1,0 +1,61 @@
+# ==============================================================================
+# PIC16F1455 USB HID Skeleton .gitignore
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Firmware (MPLAB X IDE / XC8)
+# ------------------------------------------------------------------------------
+# ビルド生成フォルダおよびIDE個人設定
+firmware/**/build/
+firmware/**/debug/
+firmware/**/dist/
+firmware/**/nbproject/private/
+
+# コンパイラ中間ファイル・シンボル・リストファイル等
+firmware/**/*.d
+firmware/**/*.p1
+firmware/**/*.i
+firmware/**/*.cmf
+firmware/**/*.elf
+firmware/**/*.hxl
+firmware/**/*.lst
+firmware/**/*.map
+firmware/**/*.mum
+firmware/**/*.o
+firmware/**/*.rlf
+firmware/**/*.sdb
+firmware/**/*.sym
+firmware/**/*.mptags
+firmware/**/*.tagsrc
+firmware/**/*.xml
+firmware/**/*.BAK
+
+# プロジェクト定義XMLファイル（configurations.xml, project.xml等）は追跡
+!firmware/**/nbproject/*.xml
+!firmware/**/nbproject/Makefile*.mk
+
+# 配布用HEXファイルのみ追跡を許可（ビルド環境のない人もすぐ書き込めるようにする場合）
+!firmware/**/dist/**/*.hex
+
+# ------------------------------------------------------------------------------
+# 2. Python (host_tools / テストスクリプト)
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+ENV/
+
+# ------------------------------------------------------------------------------
+# 3. エディタ & OS 共通一時ファイル
+# ------------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*~
+*.tmp
+.DS_Store
+Thumbs.db
+Desktop.ini
