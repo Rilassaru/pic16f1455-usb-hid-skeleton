@@ -23,7 +23,17 @@ The firmware uses the PIC's internal oscillator and USB HID class support, so no
 
 ## Hardware
 
-The example wiring below is for the PIC16F1455 in a 14-pin DIP package.
+### USB-C with an external supply
+
+Run the device from an external supply or battery during normal operation, then connect it to a PC over USB-C only when you need to configure it or write settings to Flash. The USB-C connection provides the PC data link; the power paths must be designed so the external supply and the PC's USB VBUS do not feed back into one another.
+
+![Reference circuit for USB-C data with an external power supply](images/sample_circuit_usb-c.png)
+
+In this reference schematic, the external input is labeled `Over5V` and feeds a 7805 regulator. This is not a Li-ion charging circuit: a single-cell Li-ion battery (about 3.0-4.2 V) cannot directly provide the input voltage required by a 7805 to regulate 5 V. Choose a regulator or boost stage appropriate for the battery, and provide suitable charging and cell-protection circuitry where needed. Before building, verify the regulator's input range and heat dissipation, USB VBUS isolation/reverse-current protection, and the supply's current limits. Do not connect a battery directly to the PIC's 5 V rail.
+
+### USB-powered minimal wiring (DIP-14)
+
+The simpler wiring below powers the PIC16F1455 directly from USB VBUS and is intended for a basic USB-only setup.
 
 ```text
                  PIC16F1455 (DIP-14)
@@ -106,6 +116,9 @@ pic16f1455-usb-hid-skeleton/
 |-- host_tools/
 |   |-- index.html                # WebHID console
 |   `-- test_pic_hid.py           # Python test client
+|-- images/
+|   |-- pic16f1455_dip.jpg        # PIC16F1455 package photo
+|   `-- sample_circuit_usb-c.png  # USB-C and external-supply example
 |-- LICENSE
 `-- README.md
 ```
