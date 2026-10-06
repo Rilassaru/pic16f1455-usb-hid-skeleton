@@ -10,6 +10,8 @@ The PIC16F145x combines USB support with GPIO drive capability up to 20 mA per p
 
 The firmware uses the PIC's internal oscillator and USB HID class support, so no external crystal or custom host driver is needed.
 
+![PIC16F1455 in a 14-pin SOIC package](images/pic16f1455_soic.jpg)
+
 ## Features
 
 - USB Full-Speed operation using the internal oscillator, PLL, and Active Clock Tuning (ACT).
